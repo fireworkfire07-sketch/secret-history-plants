@@ -1,4 +1,4 @@
-import os, re, asyncio, subprocess, requests, urllib.parse
+import os, re, time, shutil, asyncio, subprocess, requests, urllib.parse
 import edge_tts
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -12,17 +12,34 @@ def paragraflar():
         text = f.read()
     return [p.strip() for p in text.split("\n\n") if p.strip()]
 
-async def seslendir(text, out):
+async def _seslendir(text, out):
     await edge_tts.Communicate(text, VOICE, rate=RATE).save(out)
 
-def gorsel_uret(prompt, out):
+def seslendir(text, out, deneme=5):
+    for i in range(deneme):
+        try:
+            asyncio.run(_seslendir(text, out))
+            if os.path.exists(out) and os.path.getsize(out) > 1000:
+                return
+            raise ValueError("ses dosyasi bos")
+        except Exception as e:
+            print(f"Ses deneme {i+1}/{deneme} hata: {e}")
+            time.sleep(10 * (i + 1))
+    raise SystemExit(f"Ses uretilemedi: {out}")
+
+def gorsel_uret(prompt, out, deneme=5):
     p = urllib.parse.quote(f"{prompt}, ancient botanical illustration, aged parchment, mysterious, cinematic lighting")
     url = f"https://image.pollinations.ai/prompt/{p}?width=1280&height=720&nologo=true"
-    for _ in range(3):
-        r = requests.get(url, timeout=120)
-        if r.ok and len(r.content) > 10000:
-            open(out, "wb").write(r.content)
-            return True
+    for i in range(deneme):
+        try:
+            r = requests.get(url, timeout=120)
+            if r.ok and len(r.content) > 10000:
+                open(out, "wb").write(r.content)
+                return True
+            raise ValueError(f"kotu cevap: {r.status_code}, {len(r.content)} byte")
+        except Exception as e:
+            print(f"Gorsel deneme {i+1}/{deneme} hata: {e}")
+            time.sleep(15 * (i + 1))
     return False
 
 def sure(dosya):
@@ -68,12 +85,18 @@ def yukle(video):
 def main():
     sahneler = paragraflar()
     parcalar = []
+    onceki_img = None
     for i, p in enumerate(sahneler):
         ses = f"s{i}.mp3"; img = f"s{i}.jpg"; vid = f"s{i}.mp4"
-        asyncio.run(seslendir(p, ses))
+        seslendir(p, ses)
         prompt = re.sub(r"[^a-zA-Z0-9 ]", "", p)[:150]
         if not gorsel_uret(prompt, img):
-            raise SystemExit(f"Gorsel uretilemedi: sahne {i}")
+            if onceki_img:
+                print(f"Sahne {i+1}: gorsel uretilemedi, onceki gorsel kullaniliyor")
+                shutil.copy(onceki_img, img)
+            else:
+                raise SystemExit(f"Gorsel uretilemedi: sahne {i}")
+        onceki_img = img
         sahne_video(img, ses, vid)
         parcalar.append(vid)
         print(f"Sahne {i+1}/{len(sahneler)} tamam")
