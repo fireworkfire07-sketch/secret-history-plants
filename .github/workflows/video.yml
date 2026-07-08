@@ -18,8 +18,14 @@ jobs:
           sudo apt-get update && sudo apt-get install -y ffmpeg
           pip install -r requirements.txt
 
-      - name: Video uret
-        run: python pipeline.py
+      - name: Script ve meta uret
+  run: python generate.py
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    VIDEO_TOPIC: Black Pepper
+
+- name: Video uret
+  run: python pipeline.py
         env:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
