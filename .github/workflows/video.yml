@@ -21,7 +21,11 @@ jobs:
       - name: Script ve meta uret
         run: python generate.py
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          - name: Script ve meta uret
+  run: python generate.py
+  env:
+    GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    VIDEO_TOPIC: Black Pepper
           VIDEO_TOPIC: Black Pepper
 
       - name: Video uret ve yukle
