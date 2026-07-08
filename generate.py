@@ -1,10 +1,10 @@
 import os
 import re
-from anthropic import Anthropic
+import google.generativeai as genai
 
 TOPIC = os.environ.get("VIDEO_TOPIC", "Black Pepper")
 
-client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
 prompt = f"""
 You are SHP CORE for The Secret History of Plants.
@@ -30,22 +30,18 @@ English only.
 No brackets.
 """
 
-msg = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=8000,
-    temperature=0.7,
-    messages=[{"role": "user", "content": prompt}],
-)
+model = genai.GenerativeModel("gemini-1.5-flash")
+response = model.generate_content(prompt)
 
-text = msg.content[0].text
+text = response.text
 
 meta = re.search(r"===META===(.*?)===SCRIPT===", text, re.S)
 script = re.search(r"===SCRIPT===(.*)", text, re.S)
 
 if not meta or not script:
-    raise SystemExit("Claude output format error.")
+    raise SystemExit("Gemini output format error.")
 
 open("meta.txt", "w", encoding="utf-8").write(meta.group(1).strip())
 open("script.txt", "w", encoding="utf-8").write(script.group(1).strip())
 
-print("Generated script.txt and meta.txt")
+print("Generated script.txt and meta.txt with Gemini")
