@@ -1,32 +1,72 @@
-name: Video Uret ve Yukle
+name: SHP Pipeline
 
 on:
   workflow_dispatch:
+    inputs:
+      topic:
+        description: "Plant or story topic"
+        required: true
+        default: "Black Pepper"
+      upload_to_youtube:
+        description: "Upload final video to YouTube"
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+          cache: pip
 
-      - name: Kurulum
+      - name: Install dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Script ve meta uret
-        run: python generate.py
+      - name: Generate SHP v2 package
+        run: python shp_engine.py
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          VIDEO_TOPIC: Black Pepper
+          GEMINI_MODEL: gemini-2.0-flash
+          VIDEO_TOPIC: ${{ inputs.topic }}
+          VIDEO_MARKET: English-speaking global audience
 
-      - name: Video uret ve yukle
+      - name: Build video without upload
+        if: ${{ !inputs.upload_to_youtube }}
+        run: python pipeline.py
+        env:
+          SKIP_YOUTUBE_UPLOAD: "true"
+
+      - name: Build and upload video
+        if: ${{ inputs.upload_to_youtube }}
         run: python pipeline.py
         env:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+
+      - name: Upload test outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shp-output-${{ github.run_number }}
+          if-no-files-found: warn
+          path: |
+            script.txt
+            meta.txt
+            scenes.json
+            scorecard.json
+            package.json
+            final.mp4
+            projects/
