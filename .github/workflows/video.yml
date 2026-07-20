@@ -12,6 +12,8 @@ on:
         required: true
         type: boolean
         default: false
+  repository_dispatch:
+    types: [new_topic]
 
 jobs:
   build:
@@ -34,22 +36,37 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Resolve topic and upload settings
+        id: resolve
+        env:
+          DISPATCH_TOPIC: ${{ github.event.client_payload.topic }}
+          MANUAL_TOPIC: ${{ inputs.topic }}
+          MANUAL_UPLOAD: ${{ inputs.upload_to_youtube }}
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "topic=$DISPATCH_TOPIC" >> "$GITHUB_OUTPUT"
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "topic=$MANUAL_TOPIC" >> "$GITHUB_OUTPUT"
+            echo "upload=$MANUAL_UPLOAD" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate SHP v2 package
         run: python shp_engine.py
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-2.0-flash
-          VIDEO_TOPIC: ${{ inputs.topic }}
+          VIDEO_TOPIC: ${{ steps.resolve.outputs.topic }}
           VIDEO_MARKET: English-speaking global audience
 
       - name: Build video without upload
-        if: ${{ !inputs.upload_to_youtube }}
+        if: ${{ steps.resolve.outputs.upload != 'true' }}
         run: python pipeline.py
         env:
           SKIP_YOUTUBE_UPLOAD: "true"
 
       - name: Build and upload video
-        if: ${{ inputs.upload_to_youtube }}
+        if: ${{ steps.resolve.outputs.upload == 'true' }}
         run: python pipeline.py
         env:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
