@@ -55,7 +55,7 @@ jobs:
         run: python shp_engine.py
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-2.0-flash
+          GEMINI_MODEL: gemini-2.5-flash
           VIDEO_TOPIC: ${{ steps.resolve.outputs.topic }}
           VIDEO_MARKET: English-speaking global audience
 
