@@ -54,8 +54,8 @@ jobs:
       - name: Generate SHP v2 package
         run: python shp_engine.py
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-3.5-flash
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: llama-3.3-70b-versatile
           VIDEO_TOPIC: ${{ steps.resolve.outputs.topic }}
           VIDEO_MARKET: English-speaking global audience
 

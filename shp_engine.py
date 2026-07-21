@@ -2,14 +2,15 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 
 DEFAULT_TOPIC = "Black Pepper"
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
 def slugify(value: str) -> str:
@@ -17,31 +18,42 @@ def slugify(value: str) -> str:
     return value.strip("-") or "video"
 
 
-def gemini(prompt: str) -> str:
-    key = os.environ.get("GEMINI_API_KEY")
+def groq(prompt: str, attempts: int = 3) -> str:
+    key = os.environ.get("GROQ_API_KEY")
     if not key:
-        raise SystemExit("GEMINI_API_KEY secret is missing.")
-    response = requests.post(
-        API_URL.format(model=MODEL),
-        params={"key": key},
-        json={
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
+        raise SystemExit("GROQ_API_KEY secret is missing.")
+    for attempt in range(1, attempts + 1):
+        response = requests.post(
+            API_URL,
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={
+                "model": MODEL,
                 "temperature": 0.8,
-                "responseMimeType": "application/json",
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Follow the instructions exactly and return valid JSON only, matching the requested schema.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             },
-        },
-        timeout=180,
-    )
-    if not response.ok:
+            timeout=180,
+        )
+        if response.ok:
+            break
+        if response.status_code in (429, 503) and attempt < attempts:
+            print(f"Groq {response.status_code}, retrying ({attempt}/{attempts})...", flush=True)
+            time.sleep(20 * attempt)
+            continue
         raise SystemExit(
-            f"Gemini request failed: HTTP {response.status_code}: {response.text[:800]}"
+            f"Groq request failed: HTTP {response.status_code}: {response.text[:800]}"
         )
     data = response.json()
     try:
-        return data["candidates"][0]["content"]["parts"][0]["text"]
+        return data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
-        raise SystemExit(f"Unexpected Gemini response: {json.dumps(data)[:1000]}") from exc
+        raise SystemExit(f"Unexpected Groq response: {json.dumps(data)[:1000]}") from exc
 
 
 def parse_json(text: str) -> dict:
@@ -51,7 +63,7 @@ def parse_json(text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"Gemini returned invalid JSON: {text[:1200]}") from exc
+        raise SystemExit(f"Groq returned invalid JSON: {text[:1200]}") from exc
 
 
 def build_prompt(topic: str, market: str) -> str:
@@ -154,7 +166,7 @@ def write_outputs(package: dict, topic: str) -> Path:
 def main() -> None:
     topic = os.environ.get("VIDEO_TOPIC") or (sys.argv[1] if len(sys.argv) > 1 else DEFAULT_TOPIC)
     market = os.environ.get("VIDEO_MARKET", "English-speaking global audience")
-    package = parse_json(gemini(build_prompt(topic, market)))
+    package = parse_json(groq(build_prompt(topic, market)))
     validate(package)
     project_dir = write_outputs(package, topic)
     score = package["scorecard"]
