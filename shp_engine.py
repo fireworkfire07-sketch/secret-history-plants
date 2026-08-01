@@ -126,7 +126,7 @@ def validate(package: dict) -> None:
         raise SystemExit(f"Missing package sections: {sorted(missing)}")
     scenes = package["scenes"]
     if not isinstance(scenes, list) or len(scenes) < 10:
-        raise SystemExit("Gemini returned too few scenes.")
+        raise SystemExit(f"Groq returned too few scenes ({len(scenes) if isinstance(scenes, list) else 0}).")
     meta = package["meta"]
     for key in ("title", "description", "thumbnail_text", "hook"):
         if not str(meta.get(key, "")).strip():
