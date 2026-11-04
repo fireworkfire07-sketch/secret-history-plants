@@ -119,18 +119,47 @@ Rules:
 """
 
 
+MIN_SCENES = 10
+MAX_GENERATION_ATTEMPTS = 3
+
+
 def validate(package: dict) -> None:
     required = {"scorecard", "meta", "scenes"}
     missing = required - package.keys()
     if missing:
         raise SystemExit(f"Missing package sections: {sorted(missing)}")
     scenes = package["scenes"]
-    if not isinstance(scenes, list) or len(scenes) < 10:
-        raise SystemExit("Gemini returned too few scenes.")
+    if not isinstance(scenes, list) or len(scenes) < MIN_SCENES:
+        count = len(scenes) if isinstance(scenes, list) else 0
+        raise SystemExit(f"Groq returned too few scenes ({count}).")
     meta = package["meta"]
     for key in ("title", "description", "thumbnail_text", "hook"):
         if not str(meta.get(key, "")).strip():
             raise SystemExit(f"Missing meta field: {key}")
+
+
+def generate_package(topic: str, market: str) -> dict:
+    # Groq occasionally returns valid JSON with fewer than MIN_SCENES scenes
+    # despite the prompt asking for 35-55 (observed twice in production runs
+    # on 2026-07-30, same topic, no HTTP error — a sampling issue, not a
+    # request failure). groq() already retries on HTTP 429/503; this extends
+    # the same retry philosophy to a short-but-valid response, instead of
+    # failing the whole pipeline on the first undersized attempt.
+    package = {}
+    scene_count = 0
+    for attempt in range(1, MAX_GENERATION_ATTEMPTS + 1):
+        package = parse_json(groq(build_prompt(topic, market)))
+        scenes = package.get("scenes")
+        scene_count = len(scenes) if isinstance(scenes, list) else 0
+        if scene_count >= MIN_SCENES:
+            return package
+        print(
+            f"Groq returned only {scene_count} scenes (attempt {attempt}/{MAX_GENERATION_ATTEMPTS}), retrying...",
+            flush=True,
+        )
+    raise SystemExit(
+        f"Groq returned too few scenes after {MAX_GENERATION_ATTEMPTS} attempts (last: {scene_count})."
+    )
 
 
 def write_outputs(package: dict, topic: str) -> Path:
@@ -166,7 +195,7 @@ def write_outputs(package: dict, topic: str) -> Path:
 def main() -> None:
     topic = os.environ.get("VIDEO_TOPIC") or (sys.argv[1] if len(sys.argv) > 1 else DEFAULT_TOPIC)
     market = os.environ.get("VIDEO_MARKET", "English-speaking global audience")
-    package = parse_json(groq(build_prompt(topic, market)))
+    package = generate_package(topic, market)
     validate(package)
     project_dir = write_outputs(package, topic)
     score = package["scorecard"]
