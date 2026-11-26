@@ -101,10 +101,40 @@ def do_auth(prefix):
     """Yerelde tarayıcı açıp youtube scope'lu yeni refresh token üretir."""
     from google_auth_oauthlib.flow import InstalledAppFlow
 
+    def gecerli(v):
+        return bool(v) and "BURAYA" not in v.upper() and "GERCEK" not in v.upper() and len(v) > 15
+
+    cid = os.getenv(f"{prefix}CLIENT_ID", "")
+    csec = os.getenv(f"{prefix}CLIENT_SECRET", "")
+    if not (gecerli(cid) and gecerli(csec)):
+        # 1) Google Cloud'dan indirilen client_secret*.json dosyasını ara
+        aday = []
+        for klasor in [Path.cwd(), Path.home() / "Downloads", Path.home() / "Desktop",
+                       Path.home() / "İndirilenler", Path.home() / "Masaüstü"]:
+            if klasor.exists():
+                aday += sorted(klasor.glob("client_secret*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+        for f in aday:
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+                d = d.get("installed") or d.get("web") or {}
+                if d.get("client_id") and d.get("client_secret"):
+                    cid, csec = d["client_id"], d["client_secret"]
+                    print(f"Client bilgisi dosyadan okundu: {f}")
+                    break
+            except Exception:  # noqa: BLE001
+                pass
+    if not (gecerli(cid) and gecerli(csec)):
+        # 2) Elle sor
+        print("Google Cloud > APIs & Services > Credentials > OAuth client sayfasındaki değerleri yapıştır.")
+        cid = input("Client ID (....apps.googleusercontent.com ile biter): ").strip().strip('"')
+        csec = input("Client secret (GOCSPX- ile başlar): ").strip().strip('"')
+    if not cid.endswith(".apps.googleusercontent.com"):
+        sys.exit("[HATA] Client ID yanlış görünüyor, '.apps.googleusercontent.com' ile bitmeli.")
+
     cfg = {
         "installed": {
-            "client_id": env(prefix, "CLIENT_ID"),
-            "client_secret": env(prefix, "CLIENT_SECRET"),
+            "client_id": cid,
+            "client_secret": csec,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "redirect_uris": ["http://localhost"],
