@@ -1,0 +1,4 @@
+node_modules/
+public/run/
+timeline.json
+out/

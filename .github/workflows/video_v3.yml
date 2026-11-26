@@ -1,0 +1,83 @@
+name: SHP v3 Pro Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Plant or story topic"
+        required: true
+        default: "Nutmeg"
+      minutes:
+        description: "Target length in minutes"
+        required: true
+        default: "9"
+      upload_to_youtube:
+        description: "Upload to YouTube (leave off for the first runs and review the artifact)"
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: v3/remotion/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          cd v3/remotion && npm ci && npx remotion browser ensure
+
+      - name: 1) Script - architect, writer, retention critic, packager
+        run: python v3/script_v3.py
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: ${{ vars.GROQ_MODEL || 'openai/gpt-oss-120b' }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VIDEO_TOPIC: ${{ inputs.topic }}
+          VIDEO_MINUTES: ${{ inputs.minutes }}
+
+      - name: 2) Assets - voice, images, archival, sound, timeline
+        run: python v3/assets.py
+        env:
+          POLLINATIONS_TOKEN: ${{ secrets.POLLINATIONS_TOKEN }}
+
+      - name: 3) Render with Remotion
+        working-directory: v3/remotion
+        run: npx remotion render src/index.ts Documentary ../../final.mp4 --props=./timeline.json
+
+      - name: 4) Thumbnail and upload
+        run: python v3/finish.py
+        env:
+          UPLOAD: ${{ inputs.upload_to_youtube }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          POLLINATIONS_TOKEN: ${{ secrets.POLLINATIONS_TOKEN }}
+
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shp-v3-${{ github.run_number }}
+          if-no-files-found: warn
+          path: |
+            final.mp4
+            thumbnail.jpg
+            story.json
+            meta.txt
