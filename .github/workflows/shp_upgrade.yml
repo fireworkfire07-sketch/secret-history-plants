@@ -1,0 +1,66 @@
+name: SHP Upgrade (yayındaki videoları yükselt)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run / apply / rollback"
+        required: true
+        default: "dry-run"
+        type: choice
+        options: [dry-run, apply, rollback]
+      only:
+        description: "Sadece bu video ID'leri (virgülle, boş = hepsi)"
+        required: false
+        default: ""
+      max_views:
+        description: "Sadece bu izlenmenin altındakiler (boş = hepsi)"
+        required: false
+        default: ""
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Bağımlılıklar
+        run: |
+          pip install requests pillow google-api-python-client google-auth google-auth-oauthlib
+          sudo apt-get install -y fonts-dejavu-core
+
+      # Önceki planı / yedeği geri getir (apply ve rollback dry-run'ın çıktısını kullansın)
+      - name: Önceki çıktıyı indir
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: shp-upgrade-out
+          path: out
+          if_no_artifact_found: ignore
+          workflow_conclusion: success
+
+      - name: Çalıştır
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          ARGS=""
+          [ "${{ inputs.mode }}" = "apply" ] && ARGS="--apply"
+          [ "${{ inputs.mode }}" = "rollback" ] && ARGS="--rollback"
+          [ -n "${{ inputs.only }}" ] && ARGS="$ARGS --only ${{ inputs.only }}"
+          [ -n "${{ inputs.max_views }}" ] && ARGS="$ARGS --max-views ${{ inputs.max_views }}"
+          python shp_upgrade.py $ARGS
+
+      - name: Plan + kapaklar + yedek
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shp-upgrade-out
+          path: out/
+          retention-days: 90

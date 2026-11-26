@@ -89,10 +89,13 @@ Return valid JSON only with this exact top-level structure:
     "reason": "short explanation"
   }},
   "meta": {{
-    "title": "under 100 characters",
+    "title": "the best of title_options",
+    "title_options": ["dark secret / danger angle", "money / empire / war angle", "shocking question angle"],
     "description": "YouTube description",
     "hashtags": ["#example"],
-    "thumbnail_text": "maximum 4 words",
+    "thumbnail_text": "2 to 4 words",
+    "thumbnail_prompt": "single dramatic subject image for the thumbnail",
+    "short_title": "title for a 45-second YouTube Short teaser",
     "hook": "first 20 seconds"
   }},
   "scenes": [
@@ -116,6 +119,27 @@ Rules:
 - Every scene must create a new question, reveal, reversal, or consequence.
 - Put the biggest satisfying reveal near the end.
 - Score each category from 0 to 100 and set total to the rounded average.
+
+PACKAGING RULES (this decides whether anyone clicks):
+- Titles: max 70 characters, concrete and specific (names, numbers, places, empires),
+  curiosity gap, must stay true. Never start with "The History of" or the plant name alone.
+  Good: "The Spice Men Killed Entire Islands For". Bad: "The History of Nutmeg".
+  No ALL CAPS, no emojis, no "You won't believe".
+- thumbnail_text: 2-4 uppercase words that ADD to the title, never repeat it.
+- thumbnail_prompt: one plant/object as the hero, dark moody background, strong rim light,
+  photorealistic, high contrast, no text, no faces.
+- short_title: max 60 characters, a teaser question or shocking fact.
+
+HOOK RULES (viewers decide in 5 seconds):
+- Scene 1: the single most shocking concrete fact, max 2 short sentences.
+  Never open with "Every plant has a story", "In this video", "Welcome", or a definition.
+- Scene 2: open a loop: promise a payoff that only comes at the end.
+- Scenes 1-8 must work alone as a 45-second teaser (they become the Short).
+
+VISUAL RULES:
+- visual_prompt: photorealistic cinematic documentary still, specific subject, place, era,
+  lighting and camera angle. Vary shots: macro, wide landscape, historical scene, map, market,
+  ship, lab. No text in images. Never two similar prompts in a row.
 """
 
 
@@ -126,7 +150,7 @@ def validate(package: dict) -> None:
         raise SystemExit(f"Missing package sections: {sorted(missing)}")
     scenes = package["scenes"]
     if not isinstance(scenes, list) or len(scenes) < 10:
-        raise SystemExit("Gemini returned too few scenes.")
+        raise SystemExit("Groq returned too few scenes.")
     meta = package["meta"]
     for key in ("title", "description", "thumbnail_text", "hook"):
         if not str(meta.get(key, "")).strip():
@@ -148,6 +172,7 @@ def write_outputs(package: dict, topic: str) -> Path:
         " ".join(meta.get("hashtags", [])),
         "",
         f"THUMBNAIL: {meta['thumbnail_text']}",
+        f"TITLE_OPTIONS: {' | '.join(meta.get('title_options', []))}",
         f"HOOK: {meta['hook']}",
     ]).strip()
     files = {

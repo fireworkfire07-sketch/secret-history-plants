@@ -45,7 +45,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             echo "topic=$DISPATCH_TOPIC" >> "$GITHUB_OUTPUT"
-            echo "upload=false" >> "$GITHUB_OUTPUT"
+            # Otomatik yukleme: repo Variables > AUTO_UPLOAD=false yaparak kapatilabilir
+            echo "upload=${{ vars.AUTO_UPLOAD || 'true' }}" >> "$GITHUB_OUTPUT"
           else
             echo "topic=$MANUAL_TOPIC" >> "$GITHUB_OUTPUT"
             echo "upload=$MANUAL_UPLOAD" >> "$GITHUB_OUTPUT"
@@ -86,6 +87,7 @@ jobs:
             scorecard.json
             package.json
             final.mp4
+            short.mp4
             thumbnail.jpg
             projects/
 
