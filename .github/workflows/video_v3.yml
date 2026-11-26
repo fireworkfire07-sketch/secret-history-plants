@@ -1,6 +1,10 @@
 name: SHP v3 Pro Video
 
 on:
+  # TEMPORARY: lets the branch run a test video before merge. Remove before merging to main.
+  push:
+    branches: [v3-pro-pipeline]
+    paths: [".github/workflows/video_v3.yml", "v3/**"]
   workflow_dispatch:
     inputs:
       topic:
@@ -49,8 +53,8 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GROQ_MODEL: ${{ vars.GROQ_MODEL || 'openai/gpt-oss-120b' }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VIDEO_TOPIC: ${{ inputs.topic }}
-          VIDEO_MINUTES: ${{ inputs.minutes }}
+          VIDEO_TOPIC: ${{ inputs.topic || 'Nutmeg' }}
+          VIDEO_MINUTES: ${{ inputs.minutes || '9' }}
 
       - name: 2) Assets - voice, images, archival, sound, timeline
         run: python v3/assets.py
@@ -64,7 +68,7 @@ jobs:
       - name: 4) Thumbnail and upload
         run: python v3/finish.py
         env:
-          UPLOAD: ${{ inputs.upload_to_youtube }}
+          UPLOAD: ${{ inputs.upload_to_youtube || 'false' }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
