@@ -149,6 +149,19 @@ def validate(package: dict) -> None:
     if missing:
         raise SystemExit(f"Missing package sections: {sorted(missing)}")
     scenes = package["scenes"]
+    if isinstance(scenes, list):
+        normal = []
+        for i, sc in enumerate(scenes, 1):
+            if isinstance(sc, str):
+                sc = {"scene": i, "narration": sc, "visual_prompt": ""}
+            elif isinstance(sc, dict):
+                sc.setdefault("narration", sc.get("text") or sc.get("voiceover") or "")
+                sc.setdefault("visual_prompt", sc.get("visual") or "")
+            else:
+                continue
+            if str(sc["narration"]).strip():
+                normal.append(sc)
+        package["scenes"] = scenes = normal
     if not isinstance(scenes, list) or len(scenes) < 10:
         raise SystemExit("Groq returned too few scenes.")
     meta = package["meta"]
