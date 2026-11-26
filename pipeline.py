@@ -69,21 +69,35 @@ def seslendir(text, out, deneme=5):
     raise SystemExit(f"Ses uretilemedi: {out}")
 
 
+_SON_ISTEK = [0.0]
+POLL_ARALIK = float(os.environ.get("POLLINATIONS_INTERVAL", "0" if os.environ.get("POLLINATIONS_TOKEN") else "16"))
+
+
 def pollinations(prompt, w=1280, h=720, deneme=5):
-    p = urllib.parse.quote(f"{prompt}, {GORSEL_STIL}")
+    """Anonim Pollinations ~15 sn'de 1 istek kabul ediyor (fazlasina 402/429).
+    Istekleri araliklarla gonder; POLLINATIONS_TOKEN varsa sinirsiz/hizli."""
+    p = urllib.parse.quote(f"{prompt[:400]}, {GORSEL_STIL}")
+    headers = {}
+    if os.environ.get("POLLINATIONS_TOKEN"):
+        headers["Authorization"] = f"Bearer {os.environ['POLLINATIONS_TOKEN']}"
     for i in range(deneme):
+        bekle = POLL_ARALIK - (time.time() - _SON_ISTEK[0])
+        if bekle > 0:
+            time.sleep(bekle)
         url = (
             f"https://image.pollinations.ai/prompt/{p}?width={w}&height={h}"
-            f"&nologo=true&seed={random.randint(1, 10**7)}"
+            f"&nologo=true&model=flux&seed={random.randint(1, 10**7)}"
         )
         try:
-            r = requests.get(url, timeout=120)
+            _SON_ISTEK[0] = time.time()
+            r = requests.get(url, headers=headers, timeout=150)
             if r.ok and len(r.content) > 10000:
                 return Image.open(io.BytesIO(r.content)).convert("RGB")
-            raise ValueError(f"kotu cevap: {r.status_code}, {len(r.content)} byte")
+            raise ValueError(f"kotu cevap: {r.status_code}, {r.text[:120] if len(r.content) < 2000 else len(r.content)}")
         except Exception as e:
             print(f"Gorsel deneme {i+1}/{deneme} hata: {e}")
-            time.sleep(15 * (i + 1))
+            if i >= 2:
+                time.sleep(20 * (i - 1))
     return None
 
 

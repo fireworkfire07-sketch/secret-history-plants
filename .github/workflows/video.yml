@@ -65,6 +65,7 @@ jobs:
         run: python pipeline.py
         env:
           SKIP_YOUTUBE_UPLOAD: "true"
+          POLLINATIONS_TOKEN: ${{ secrets.POLLINATIONS_TOKEN }}
 
       - name: Build and upload video
         if: ${{ steps.resolve.outputs.upload == 'true' }}
@@ -73,6 +74,7 @@ jobs:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          POLLINATIONS_TOKEN: ${{ secrets.POLLINATIONS_TOKEN }}
 
       - name: Upload test outputs
         if: always()
