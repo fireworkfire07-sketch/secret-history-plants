@@ -93,7 +93,6 @@ def get_youtube(prefix):
         client_id=env(prefix, "CLIENT_ID"),
         client_secret=env(prefix, "CLIENT_SECRET"),
         token_uri="https://oauth2.googleapis.com/token",
-        scopes=SCOPES,
     )
     return build("youtube", "v3", credentials=creds, cache_discovery=False)
 
@@ -118,7 +117,16 @@ def do_auth(prefix):
 
 
 def list_videos(yt):
-    ch = yt.channels().list(part="contentDetails,snippet", mine=True).execute()
+    try:
+        ch = yt.channels().list(part="contentDetails,snippet", mine=True).execute()
+    except Exception as e:  # noqa: BLE001
+        if "403" in str(e) or "scope" in str(e).lower():
+            sys.exit(
+                "[HATA] YouTube token'ının yetkisi yetmiyor (muhtemelen sadece upload izni var).\n"
+                "Bilgisayarında bir kere çalıştır:  python shp_upgrade.py --auth\n"
+                "Çıkan YT_REFRESH_TOKEN'ı GitHub secret'ına yapıştır, sonra tekrar dene."
+            )
+        raise
     if not ch.get("items"):
         sys.exit("[HATA] Bu token'a bağlı kanal bulunamadı.")
     print(f"Kanal: {ch['items'][0]['snippet']['title']}")
